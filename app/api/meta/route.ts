@@ -58,21 +58,21 @@ const parseAmazon = ($: cheerio.CheerioAPI) => {
         $('.a-price:not(.a-text-price) .a-offscreen').first().text().trim() ||
         $('.a-price-whole').first().text().trim() ||
         $('#priceblock_ourprice').text().trim() ||
-        $('#priceblock_dealprice').text().trim();
+        $('#priceblock_dealprice').text().trim() || '';
         
     const image = 
         $('#landingImage').attr('src') || 
         $('#imgBlkFront').attr('src') || 
         $('#main-image').attr('src') ||
         $('.a-dynamic-image').first().attr('src') ||
-        $('.a-button-text img').first().attr('src'); // sometimes small image
+        $('.a-button-text img').first().attr('src') || '';
 
     return { price, image };
 };
 
 const parseFlipkart = ($: cheerio.CheerioAPI) => {
-    const price = $('div[class*="_30jeq3"]').first().text().trim();
-    const image = $('img[class*="_396cs4"]').first().attr('src');
+    const price = $('div[class*="_30jeq3"]').first().text().trim() || '';
+    const image = $('img[class*="_396cs4"]').first().attr('src') || '';
     return { price, image };
 };
 
@@ -128,8 +128,8 @@ const parseAjio = ($: cheerio.CheerioAPI) => {
 const parseMeesho = ($: cheerio.CheerioAPI) => {
     // Meesho often uses styled-components classes which change, but meta tags are reliable
     // Fallback to specific identifiable structures if possible
-    const price = $('h4[class*="Price__CurrentPrice"]').text().trim();
-    const image = $('img[class*="ProductImage"]').attr('src');
+    const price = $('h4[class*="Price__CurrentPrice"]').text().trim() || '';
+    const image = $('img[class*="ProductImage"]').attr('src') || '';
     return { price, image };
 };
 
@@ -137,12 +137,12 @@ const parseHM = ($: cheerio.CheerioAPI) => {
     const price = 
         $('#product-price .price-value').text().trim() || 
         $('.product-item-price').first().text().trim() ||
-        $('span.price-value').text().trim();
+        $('span.price-value').text().trim() || '';
             
     const image = 
         $('.product-detail-main-image-container img').first().attr('src') ||
         $('.product-detail-main-image img').first().attr('src') ||
-        $('figure.pdp-image img').first().attr('src');
+        $('figure.pdp-image img').first().attr('src') || '';
         
     return { price, image };
 };
@@ -150,12 +150,12 @@ const parseHM = ($: cheerio.CheerioAPI) => {
 const parseZara = ($: cheerio.CheerioAPI) => {
     const price = 
         $('.price__amount').first().text().trim() || 
-        $('.product-detail-info__price-amount').text().trim();
+        $('.product-detail-info__price-amount').text().trim() || '';
     
     // Zara images are often in a media-image class or set as background
     let image = 
         $('.media-image__image').first().attr('src') || 
-        $('.product-detail-images__image').first().attr('src');
+        $('.product-detail-images__image').first().attr('src') || '';
         
     return { price, image };
 };
@@ -164,11 +164,11 @@ const parseSavana = ($: cheerio.CheerioAPI) => {
     // Savana (Urbanic) specific
     const price = 
         $('.product-price').first().text().trim() ||
-        $('div[class*="price"]').first().text().trim();
+        $('div[class*="price"]').first().text().trim() || '';
 
     const image = 
         $('.product-image').first().attr('src') ||
-        $('img[class*="gallery"]').first().attr('src');
+        $('img[class*="gallery"]').first().attr('src') || '';
 
     return { price, image };
 };
