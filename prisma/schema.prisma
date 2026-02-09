@@ -1,0 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL") // Uses connection pooling
+  directUrl = env("POSTGRES_URL_NON_POOLING") // Uses a direct connection
+}
+
+model WishlistItem {
+  id              String        @id @default(uuid())
+  url             String
+  title           String?
+  image           String?
+  price           String?
+  originalPrice   String?
+  currentPrice    String?
+  lastChecked     DateTime?
+  notes           String?
+  priority        String?       @default("medium") // low, medium, high, dream
+  reactions       String?       // JSON string for storing reactions: { "user1": "😍", "count": 2 }
+  
+  category        Category?     @relation(fields: [categoryId], references: [id])
+  categoryId      String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Category {
+  id        String         @id @default(uuid())
+  name      String
+  color     String         @default("#FF6B9D")
+  icon      String         @default("🌸")
+  items     WishlistItem[]
+  createdAt DateTime       @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  type      String   // new_item, purchased, note, reaction, price_drop
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

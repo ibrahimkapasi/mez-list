@@ -1,0 +1,21 @@
+{
+  "name": "Mezlist - Our Little Universe",
+  "short_name": "Mezlist",
+  "description": "Where your wishes are safe with me",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF9FB",
+  "theme_color": "#FF6B9D",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
