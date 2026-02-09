@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { ExternalLink, Trash2, ShoppingBag, Heart, Star, Info, Tag } from 'lucide-react';
-import { deleteWishlistItem, updateReaction, checkItemPrice } from '@/app/actions';
+import { deleteWishlistItem, toggleReaction, checkItemPrice } from '@/app/actions';
 import { useState } from 'react';
 import clsx from 'clsx';
 import * as Tooltip from '@radix-ui/react-tooltip';

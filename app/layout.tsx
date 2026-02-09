@@ -32,14 +32,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+import { cookies } from "next/headers";
+import IdentityCheck from "@/components/IdentityCheck";
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const identity = cookieStore.get('mezlist_user')?.value;
+
   return (
     <html lang="en">
       <body className={`${inter.variable} ${poppins.variable} ${dancingScript.variable} font-sans bg-background text-text`}>
+        <IdentityCheck existingIdentity={identity} />
         {children}
       </body>
     </html>

@@ -2,8 +2,22 @@
 
 import { PrismaClient } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 
 const prisma = new PrismaClient();
+
+// --- Identity ---
+
+export async function setUserIdentity(name: string) {
+  const cookieStore = await cookies();
+  cookieStore.set('mezlist_user', name, { secure: true, httpOnly: true, maxAge: 60 * 60 * 24 * 365 }); // 1 year
+  return { success: true };
+}
+
+export async function getUserIdentity() {
+    const cookieStore = await cookies();
+    return cookieStore.get('mezlist_user')?.value;
+}
 
 // --- Wishlist Items ---
 
@@ -28,11 +42,15 @@ export async function addWishlistItem(data: {
   categoryId?: string;
 }) {
   try {
+    const cookieStore = await cookies();
+    const addedBy = cookieStore.get('mezlist_user')?.value || 'Anonymous';
+
     const item = await prisma.wishlistItem.create({
       data: {
         ...data,
         originalPrice: data.price,
         currentPrice: data.price,
+        addedBy,
       },
     });
     
@@ -40,7 +58,7 @@ export async function addWishlistItem(data: {
     await prisma.notification.create({
       data: {
         type: 'new_item',
-        message: `✨ New wish added: "${data.title || 'Something new'}"`,
+        message: `✨ ${addedBy} added a new wish: "${data.title || 'Something new'}"`,
       }
     });
 
@@ -65,26 +83,49 @@ export async function deleteWishlistItem(id: string) {
     }
 }
 
-export async function updateReaction(itemId: string, reactions: string) {
+export async function toggleReaction(itemId: string, emoji: string) {
     try {
+        const cookieStore = await cookies();
+        const userId = cookieStore.get('mezlist_user')?.value || 'Anonymous';
+
+        const item = await prisma.wishlistItem.findUnique({ where: { id: itemId } });
+        if (!item) return { success: false, error: 'Item not found' };
+
+        const currentReactions = item.reactions ? JSON.parse(item.reactions) : {};
+        
+        // Update user's reaction
+        // If clicking same emoji, maybe remove it? For now, just set it.
+        if (currentReactions[userId] === emoji) {
+            delete currentReactions[userId]; // Toggle off
+        } else {
+            currentReactions[userId] = emoji;
+        }
+
         await prisma.wishlistItem.update({
             where: { id: itemId },
-            data: { reactions }
+            data: { reactions: JSON.stringify(currentReactions) }
         });
         
-        // Notify about reaction (optional throttle here in real app)
-        await prisma.notification.create({
-             data: {
-                 type: 'reaction',
-                 message: `❤️ Someone reacted to an item!`,
-             }
-        });
+        // Notify about reaction
+        if (currentReactions[userId]) {
+            await prisma.notification.create({
+                data: {
+                    type: 'reaction',
+                    message: `❤️ ${userId} reacted ${emoji} to an item!`,
+                }
+            });
+        }
 
         revalidatePath('/');
         return { success: true };
     } catch (error) {
         return { success: false, error: 'Failed to update reaction' };
     }
+}
+
+export async function updateReaction(itemId: string, reactions: string) {
+    // Deprecated but kept for backward compatibility if needed temporarily
+    return toggleReaction(itemId, '❤️'); 
 }
 
 export async function checkItemPrice(itemId: string, url: string) {

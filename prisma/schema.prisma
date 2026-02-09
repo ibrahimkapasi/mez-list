@@ -23,6 +23,7 @@ model WishlistItem {
   notes           String?
   priority        String?       @default("medium") // low, medium, high, dream
   reactions       String?       // JSON string for storing reactions: { "user1": "😍", "count": 2 }
+  addedBy         String?       // "Ibrahim" or "Her"
   
   category        Category?     @relation(fields: [categoryId], references: [id])
   categoryId      String?
