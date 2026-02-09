@@ -21,9 +21,9 @@ const config: Config = {
         error: "#FF6B6B",
       },
       fontFamily: {
-        sans: ["Inter", "Open Sans", "sans-serif"],
-        heading: ["Poppins", "Montserrat", "sans-serif"],
-        romantic: ["Dancing Script", "cursive"],
+        sans: ["var(--font-quicksand)", "sans-serif"],
+        heading: ["var(--font-quicksand)", "sans-serif"],
+        romantic: ["var(--font-dancing)", "cursive"],
       },
     },
   },

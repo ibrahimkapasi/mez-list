@@ -45,7 +45,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
               {filteredItems.length} {filteredItems.length === 1 ? 'Wish' : 'Wishes'} ✨
             </div>
             <NotificationBell />
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 border-2 border-white shadow-md ring-2 ring-pink-100"></div>
+            {/* <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-300 to-purple-300 border-2 border-white shadow-md ring-2 ring-pink-100"></div> */}
           </div>
         </div>
         

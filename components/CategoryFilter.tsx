@@ -33,7 +33,7 @@ export default function CategoryFilter({ categories, activeCategory }: { categor
                 >
                     🌸 Everything
                 </button>
-                {categories.map((cat) => (
+                {categories.filter(c => c.name !== 'Everything').map((cat) => (
                     <button
                         key={cat.id}
                         onClick={() => handleSelect(cat.id)}

@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Poppins, Dancing_Script } from "next/font/google";
+import { Quicksand, Dancing_Script } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const poppins = Poppins({ 
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-  variable: "--font-poppins"
+const quicksand = Quicksand({ 
+  subsets: ["latin"], 
+  variable: "--font-quicksand",
+  weight: ["300", "400", "500", "600", "700"]
 });
+
 const dancingScript = Dancing_Script({ 
   subsets: ["latin"],
   variable: "--font-dancing"
@@ -45,7 +45,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${poppins.variable} ${dancingScript.variable} font-sans bg-background text-text`}>
+      <body className={`${quicksand.variable} ${dancingScript.variable} font-sans bg-background text-text`}>
         <IdentityCheck existingIdentity={identity} />
         {children}
       </body>

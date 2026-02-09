@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Plus, Link as LinkIcon, Loader2, Sparkles, X, ChevronDown } from 'lucide-react';
+import { Plus, Link, Loader2, Sparkles, X, Check, ArrowDown, ArrowRight, ArrowUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { addWishlistItem, getCategories, createCategory } from '@/app/actions';
 import clsx from 'clsx';
 
 const PRIORITIES = [
-  { id: 'low', label: 'Low', emoji: '🟢', color: 'bg-success/20 text-success-700' },
-  { id: 'medium', label: 'Medium', emoji: '🟡', color: 'bg-warning/20 text-warning-700' },
-  { id: 'high', label: 'High', emoji: '🔴', color: 'bg-error/20 text-error-700' },
-  { id: 'dream', label: 'Dream', emoji: '✨', color: 'bg-accent/20 text-accent-700' },
+  { id: 'low', label: 'Low', icon: <ArrowDown size={16} />, color: 'bg-success/20 text-success-700' },
+  { id: 'medium', label: 'Medium', icon: <ArrowRight size={16} />, color: 'bg-warning/20 text-warning-700' },
+  { id: 'high', label: 'High', icon: <ArrowUp size={16} />, color: 'bg-error/20 text-error-700' },
+  { id: 'dream', label: 'Dream', icon: <Sparkles size={16} />, color: 'bg-accent/20 text-accent-700' },
 ];
 
 export default function AddItemDialog({ customTrigger }: { customTrigger?: React.ReactNode }) {
@@ -105,6 +105,13 @@ export default function AddItemDialog({ customTrigger }: { customTrigger?: React
       setNewCategoryName('');
   };
 
+  const formatPrice = (price: string) => {
+    if (!price) return null;
+    const num = price.replace(/[^0-9.]/g, '');
+    if (!num) return null;
+    return `₹${num}`;
+  };
+
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
@@ -121,9 +128,9 @@ export default function AddItemDialog({ customTrigger }: { customTrigger?: React
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-card-bg p-6 shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-3xl border-pink-100 max-h-[90vh] overflow-y-auto">
+        <Dialog.Content className="fixed left-[50%] top-[50%] z-50 flex flex-col w-[90vw] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-card-bg p-5 shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 rounded-3xl border-pink-100 max-h-[85vh] overflow-y-auto overflow-x-hidden">
           <div className="flex flex-col space-y-1.5 text-center sm:text-left">
-            <Dialog.Title className="text-2xl font-bold font-heading leading-none tracking-tight text-primary flex items-center gap-2">
+            <Dialog.Title className="text-xl sm:text-2xl font-bold font-heading leading-none tracking-tight text-primary flex items-center gap-2 justify-center sm:justify-start">
               <Sparkles className="text-warning fill-warning" /> Add a New Wish!
             </Dialog.Title>
             <Dialog.Description className="text-sm text-text-light">
@@ -131,13 +138,13 @@ export default function AddItemDialog({ customTrigger }: { customTrigger?: React
             </Dialog.Description>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <div className="grid flex-1 gap-2">
+          <div className="flex items-center space-x-2 w-full">
+            <div className="flex-1 min-w-0 gap-2">
               <div className="flex items-center gap-2 border-2 border-pink-100 rounded-2xl px-3 py-2 focus-within:border-primary transition-colors bg-background">
-                <LinkIcon className="text-pink-300" size={20} />
+                <Link className="text-pink-300" size={20} />
                 <input
                   placeholder="https://..."
-                  className="flex-1 outline-none text-text bg-transparent placeholder:text-text-light/50"
+                  className="flex-1 outline-none text-text bg-transparent placeholder:text-text-light/50 min-w-0"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleFetch()}
@@ -149,7 +156,7 @@ export default function AddItemDialog({ customTrigger }: { customTrigger?: React
               whileTap={{ scale: 0.95 }}
               onClick={handleFetch}
               disabled={loading}
-              className="bg-primary text-white p-3 rounded-2xl font-bold shadow-sm hover:bg-pink-500 disabled:opacity-50"
+              className="bg-primary text-white p-3 rounded-2xl font-bold shadow-sm hover:bg-pink-500 disabled:opacity-50 shrink-0"
             >
               {loading ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
             </motion.button>
@@ -179,7 +186,9 @@ export default function AddItemDialog({ customTrigger }: { customTrigger?: React
                   )}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-text truncate font-heading">{fetchedData.title}</h3>
-                    <p className="text-primary font-bold mt-1">{fetchedData.price || 'Price unknown'}</p>
+                    {formatPrice(fetchedData.price) && (
+                         <p className="text-primary font-bold mt-1">{formatPrice(fetchedData.price)}</p>
+                    )}
                   </div>
                 </div>
 
@@ -197,19 +206,19 @@ export default function AddItemDialog({ customTrigger }: { customTrigger?: React
                 {/* Priority */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-text-light">Priority 🎯</label>
-                    <div className="flex gap-2 overflow-x-auto pb-2">
+                    <div className="flex flex-wrap gap-2">
                         {PRIORITIES.map((p) => (
                             <button
                                 key={p.id}
                                 onClick={() => setPriority(p.id)}
                                 className={clsx(
-                                    "flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap border-2",
+                                    "flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium transition-all border-2 flex-1 justify-center min-w-[80px]",
                                     priority === p.id 
-                                        ? "border-primary bg-primary/10" 
+                                        ? "border-primary bg-primary/10 text-primary" 
                                         : "border-transparent bg-gray-50 text-gray-500 hover:bg-gray-100"
                                 )}
                             >
-                                <span>{p.emoji}</span> {p.label}
+                                <span>{p.icon}</span> {p.label}
                             </button>
                         ))}
                     </div>
@@ -219,21 +228,29 @@ export default function AddItemDialog({ customTrigger }: { customTrigger?: React
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-text-light">Category 📂</label>
                     {!isNewCategory ? (
-                        <div className="flex gap-2">
-                            <select 
-                                className="flex-1 border-2 border-pink-100 rounded-2xl p-3 bg-background outline-none text-sm appearance-none"
-                                value={categoryId}
-                                onChange={(e) => {
-                                    if (e.target.value === 'new') setIsNewCategory(true);
-                                    else setCategoryId(e.target.value);
-                                }}
+                        <div className="grid grid-cols-2 gap-2">
+                            {categories.filter(c => c.name !== 'Everything').map(c => (
+                                <button
+                                    key={c.id}
+                                    onClick={() => setCategoryId(c.id)}
+                                    className={clsx(
+                                        "flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-sm font-medium text-left",
+                                        categoryId === c.id 
+                                            ? "border-primary bg-pink-50 text-primary shadow-sm" 
+                                            : "border-pink-100 bg-white text-gray-600 hover:border-pink-200 hover:bg-pink-50/50"
+                                    )}
+                                >
+                                    <span className="text-lg shrink-0">{c.icon}</span>
+                                    <span className="truncate">{c.name}</span>
+                                    {categoryId === c.id && <Check size={16} className="ml-auto shrink-0" />}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => setIsNewCategory(true)}
+                                className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-pink-200 text-pink-400 hover:bg-pink-50 transition-all text-sm font-medium"
                             >
-                                <option value="">Select a category...</option>
-                                {categories.map(c => (
-                                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                                ))}
-                                <option value="new">➕ Create new category</option>
-                            </select>
+                                <Plus size={18} /> New Category
+                            </button>
                         </div>
                     ) : (
                         <div className="flex gap-2">

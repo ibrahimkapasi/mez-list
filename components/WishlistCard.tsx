@@ -181,13 +181,6 @@ export default function WishlistCard({ item }: { item: WishlistItemProps }) {
                 {item.originalPrice}
               </div>
             )}
-            <button 
-                onClick={handleCheckPrice}
-                disabled={isCheckingPrice}
-                className="text-[10px] text-gray-400 underline decoration-dotted hover:text-primary mt-0.5 flex items-center gap-1"
-            >
-                {isCheckingPrice ? <Loader2 size={10} className="animate-spin" /> : 'Check Price'}
-            </button>
           </div>
           
           <a
