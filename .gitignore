@@ -34,5 +34,5 @@ ts-debug.log*
 next-env.d.ts
 
 # prisma
-# /prisma/*.db
-# /prisma/*.db-journal
+/prisma/*.db
+/prisma/*.db-journal
