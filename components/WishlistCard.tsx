@@ -62,11 +62,8 @@ export default function WishlistCard({ item }: { item: WishlistItemProps }) {
   };
 
   const handleReaction = async (emoji: string) => {
-      // Simple toggle logic for demo purposes (in real app, use user ID)
-      const currentReactions = item.reactions ? JSON.parse(item.reactions) : {};
-      const newCount = (currentReactions[emoji] || 0) + 1;
-      const updated = JSON.stringify({ ...currentReactions, [emoji]: newCount });
-      await updateReaction(item.id, updated);
+      // Optimistic update could go here, but for now we wait for server
+      await toggleReaction(item.id, emoji);
       setShowReactions(false);
   };
 
