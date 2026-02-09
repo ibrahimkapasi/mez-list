@@ -12,8 +12,13 @@ export async function POST(request: Request) {
 
     const { data } = await axios.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Upgrade-Insecure-Requests': '1',
+        'Referer': 'https://www.google.com/'
+      },
+      timeout: 10000 // 10 second timeout
     });
 
     const $ = cheerio.load(data);
@@ -22,7 +27,8 @@ export async function POST(request: Request) {
       $(`meta[name="${name}"]`).attr('content') || 
       $(`meta[property="${name}"]`).attr('content') || 
       $(`meta[property="og:${name}"]`).attr('content') ||
-      $(`meta[property="twitter:${name}"]`).attr('content');
+      $(`meta[property="twitter:${name}"]`).attr('content') ||
+      $(`meta[itemprop="${name}"]`).attr('content');
 
     // Helper to clean price string
     const cleanPrice = (str: string) => {
@@ -127,11 +133,45 @@ export async function POST(request: Request) {
     }
 
     const title = getMeta('title') || $('title').text() || '';
-    const image = getMeta('image') || '';
+    
+    // Improved image extraction
+    let image = getMeta('image');
+    
+    if (!image) {
+        // Amazon specific selectors
+        image = $('#landingImage').attr('src') || 
+                $('#imgBlkFront').attr('src') || 
+                $('#main-image').attr('src') ||
+                $('.a-dynamic-image').first().attr('src');
+    }
+
+    if (!image) {
+        // Link tag fallback
+        image = $('link[rel="image_src"]').attr('href');
+    }
+
+    if (!image) {
+        // Generic: Try to find the first large image
+        // This is a bit risky but better than nothing
+        $('img').each((_, el) => {
+            if (image) return;
+            const src = $(el).attr('src');
+            const width = $(el).attr('width');
+            const height = $(el).attr('height');
+            
+            // Basic heuristic: ignore small icons/pixels
+            if (src && src.startsWith('http') && (!width || parseInt(width) > 100)) {
+                 // Skip common tracking pixels or layout images if possible
+                 if (!src.includes('sprite') && !src.includes('logo') && !src.includes('icon')) {
+                     image = src;
+                 }
+            }
+        });
+    }
 
     return NextResponse.json({
       title: title.trim(),
-      image,
+      image: image || '',
       price: finalPrice || '',
       url
     });

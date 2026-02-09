@@ -70,6 +70,14 @@ export default function WishlistCard({ item }: { item: WishlistItemProps }) {
   const parsedReactions = item.reactions ? JSON.parse(item.reactions) : {};
   const hasPriceDrop = item.originalPrice && item.currentPrice && item.currentPrice !== item.originalPrice; // Simplified logic
 
+  const formatPrice = (price: string | null) => {
+    if (!price) return 'Priceless';
+    // If it already has a currency symbol (non-digit/dot at start), return as is
+    if (/^[^\d.]/.test(price)) return price;
+    // Otherwise assume INR and add symbol
+    return `₹${price}`;
+  };
+
   return (
     <motion.div
       layout
@@ -174,11 +182,11 @@ export default function WishlistCard({ item }: { item: WishlistItemProps }) {
         <div className="mt-auto flex items-center justify-between">
           <div className="flex flex-col items-start">
             <div className="text-primary font-extrabold text-xl font-heading">
-              {item.currentPrice || item.price || 'Priceless'}
+              {formatPrice(item.currentPrice || item.price)}
             </div>
             {item.originalPrice && item.currentPrice && item.currentPrice !== item.originalPrice && (
               <div className="text-xs text-gray-400 line-through">
-                {item.originalPrice}
+                {formatPrice(item.originalPrice)}
               </div>
             )}
           </div>
