@@ -2,182 +2,243 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-export async function POST(request: Request) {
-  try {
-    const { url } = await request.json();
+// User Agents to rotate
+const USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+];
 
-    if (!url) {
-      return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+const getRandomUserAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+
+// Helper to clean price string
+const cleanPrice = (str: string | null | undefined) => {
+    if (!str) return null;
+    // Remove non-numeric characters except dots
+    const cleaned = str.replace(/[^0-9.]/g, '');
+    // Remove trailing dot if present
+    return cleaned.replace(/\.$/, '');
+};
+
+const fetchWithRetry = async (url: string, retries = 2): Promise<string | null> => {
+    for (let i = 0; i <= retries; i++) {
+        try {
+            const { data } = await axios.get(url, {
+                headers: {
+                    'User-Agent': getRandomUserAgent(),
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache',
+                    'Upgrade-Insecure-Requests': '1',
+                    'Referer': 'https://www.google.com/'
+                },
+                timeout: 15000,
+                maxRedirects: 5
+            });
+            return data;
+        } catch (error) {
+            if (i === retries) {
+                console.error(`Failed to fetch ${url} after ${retries + 1} attempts`);
+                return null;
+            }
+            // Wait a bit before retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        }
     }
+    return null;
+};
 
-    const { data } = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Upgrade-Insecure-Requests': '1',
-        'Referer': 'https://www.google.com/'
-      },
-      timeout: 10000 // 10 second timeout
+// Domain-specific parsing logic
+const parseAmazon = ($: cheerio.CheerioAPI) => {
+    const price = 
+        $('.a-price:not(.a-text-price) .a-offscreen').first().text().trim() ||
+        $('.a-price-whole').first().text().trim() ||
+        $('#priceblock_ourprice').text().trim() ||
+        $('#priceblock_dealprice').text().trim();
+        
+    const image = 
+        $('#landingImage').attr('src') || 
+        $('#imgBlkFront').attr('src') || 
+        $('#main-image').attr('src') ||
+        $('.a-dynamic-image').first().attr('src') ||
+        $('.a-button-text img').first().attr('src'); // sometimes small image
+
+    return { price, image };
+};
+
+const parseFlipkart = ($: cheerio.CheerioAPI) => {
+    const price = $('div[class*="_30jeq3"]').first().text().trim();
+    const image = $('img[class*="_396cs4"]').first().attr('src');
+    return { price, image };
+};
+
+const parseMyntra = ($: cheerio.CheerioAPI) => {
+    // Myntra uses JSON inside script tag often
+    let price = '';
+    let image = '';
+    
+    // Try script data first
+    $('script').each((_, el) => {
+        const content = $(el).html() || '';
+        if (content.includes('pdpData')) {
+            try {
+                // Extract JSON object
+                const jsonMatch = content.match(/pdpData\s*=\s*({.+?});/);
+                if (jsonMatch && jsonMatch[1]) {
+                    const data = JSON.parse(jsonMatch[1]);
+                    price = data.pdpData?.price?.discounted || data.pdpData?.price?.mrp || '';
+                    image = data.pdpData?.media?.albums?.[0]?.images?.[0]?.src || '';
+                }
+            } catch (e) {}
+        }
     });
 
-    const $ = cheerio.load(data);
+    return { price, image };
+};
 
-    const getMeta = (name: string) => 
-      $(`meta[name="${name}"]`).attr('content') || 
-      $(`meta[property="${name}"]`).attr('content') || 
-      $(`meta[property="og:${name}"]`).attr('content') ||
-      $(`meta[property="twitter:${name}"]`).attr('content') ||
-      $(`meta[itemprop="${name}"]`).attr('content');
-
-    // Helper to clean price string
-    const cleanPrice = (str: string) => {
-      if (!str) return null;
-      // Remove commas, currency symbols (non-digits/non-dots)
-      // Be careful not to remove the decimal point
-      const cleaned = str.replace(/[^0-9.]/g, '');
-      // Remove trailing dot if present (Amazon often leaves "999.")
-      return cleaned.replace(/\.$/, '');
-    };
-
+const parseAjio = ($: cheerio.CheerioAPI) => {
     let price = '';
-    let currency = 'INR'; // Default to INR as requested
-
-    // 1. Try JSON-LD (Best for accurate pricing)
-    try {
-      $('script[type="application/ld+json"]').each((_, el) => {
-        if (price) return; // Stop if found
-        try {
-            const html = $(el).html();
-            if (!html) return;
-            const json = JSON.parse(html);
-            
-            // Handle array of objects or single object
-            const items = Array.isArray(json) ? json : [json];
-            
-            // Find Product entity
-            const product = items.find(i => 
-                i['@type'] === 'Product' || 
-                (Array.isArray(i['@type']) && i['@type'].includes('Product'))
-            );
-          
-            if (product && product.offers) {
-                const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers;
-                if (offer) {
-                    // Prioritize lowPrice for ranges, then price
-                    const p = offer.price || offer.lowPrice || offer.highPrice;
-                    const c = offer.priceCurrency;
-                    if (p) {
-                        price = p.toString();
-                        if (c) currency = c;
+    let image = '';
+    
+    // Try window.__PRELOADED_STATE__
+    $('script').each((_, el) => {
+        const content = $(el).html() || '';
+        if (content.includes('window.__PRELOADED_STATE__')) {
+            try {
+                const jsonMatch = content.match(/window\.__PRELOADED_STATE__\s*=\s*({.+?});/);
+                if (jsonMatch && jsonMatch[1]) {
+                    const data = JSON.parse(jsonMatch[1]);
+                    const product = data?.product?.productDetails;
+                    if (product) {
+                        price = product.price?.value || product.wasPriceData?.value || '';
+                        image = product.images?.[0]?.url || '';
                     }
                 }
-            }
-        } catch (e) {
-          // Ignore json parse errors
+            } catch (e) {}
         }
-      });
-    } catch (e) {
-      console.log('JSON-LD parsing failed', e);
-    }
-
-    // 2. Try Meta tags if JSON-LD failed
-    if (!price) {
-        price = getMeta('product:price:amount') || 
-                getMeta('price:amount') || 
-                '';
-        const curr = getMeta('product:price:currency') || getMeta('price:currency');
-        if (curr) currency = curr;
-    }
-
-    // 3. Fallback to specific selectors for common Indian sites (Flipkart, Amazon)
-    if (!price) {
-       // Amazon India
-       // Strategy: Look for the main price block, avoiding the strike-through "text-price" (MRP)
-       // .a-price identifies a price block. .a-text-price is usually the MRP (strike-through).
-       // We want the one that is NOT .a-text-price.
-       const amazonMainPrice = $('.a-price:not(.a-text-price) .a-offscreen').first().text().trim();
-       if (amazonMainPrice) {
-           price = amazonMainPrice;
-       } else {
-           // Fallback to old selector if the smart one fails
-           const amazonFallback = $('.a-price-whole').first().text().trim();
-           if (amazonFallback) price = amazonFallback;
-       }
-
-       // Flipkart
-       // _30jeq3 is the main price class. _16Jk6d is often combined with it on product pages.
-       const flipkartPrice = $('div[class*="_30jeq3"]').first().text().trim(); 
-       if (flipkartPrice) price = flipkartPrice;
-       
-       // Myntra/generic fallback
-       if (!price) {
-         // Try to find something that looks like a price near the title? Hard to do generically.
-         // Just simple fallback
-         const p = $('[class*="price"]').first().text();
-         if (p && p.match(/[0-9]/)) {
-            // Be careful with this, might pick up garbage.
-         }
-       }
-    }
-
-    // Final clean up
-    const cleanedPrice = cleanPrice(price);
-    
-    // Format final price string
-    let finalPrice = '';
-    if (cleanedPrice) {
-        // If currency is USD/EUR etc, we might want to keep it, but user asked for Rupee symbol.
-        // We just return the number and let frontend handle formatting with Rupee.
-        finalPrice = cleanedPrice;
-    }
-
-    const title = getMeta('title') || $('title').text() || '';
-    
-    // Improved image extraction
-    let image = getMeta('image');
-    
-    if (!image) {
-        // Amazon specific selectors
-        image = $('#landingImage').attr('src') || 
-                $('#imgBlkFront').attr('src') || 
-                $('#main-image').attr('src') ||
-                $('.a-dynamic-image').first().attr('src');
-    }
-
-    if (!image) {
-        // Link tag fallback
-        image = $('link[rel="image_src"]').attr('href');
-    }
-
-    if (!image) {
-        // Generic: Try to find the first large image
-        // This is a bit risky but better than nothing
-        $('img').each((_, el) => {
-            if (image) return;
-            const src = $(el).attr('src');
-            const width = $(el).attr('width');
-            const height = $(el).attr('height');
-            
-            // Basic heuristic: ignore small icons/pixels
-            if (src && src.startsWith('http') && (!width || parseInt(width) > 100)) {
-                 // Skip common tracking pixels or layout images if possible
-                 if (!src.includes('sprite') && !src.includes('logo') && !src.includes('icon')) {
-                     image = src;
-                 }
-            }
-        });
-    }
-
-    return NextResponse.json({
-      title: title.trim(),
-      image: image || '',
-      price: finalPrice || '',
-      url
     });
+    
+    return { price, image };
+};
 
-  } catch (error) {
-    console.error('Error fetching metadata:', error);
-    return NextResponse.json({ error: 'Failed to fetch metadata' }, { status: 500 });
-  }
+const parseMeesho = ($: cheerio.CheerioAPI) => {
+    // Meesho often uses styled-components classes which change, but meta tags are reliable
+    // Fallback to specific identifiable structures if possible
+    const price = $('h4[class*="Price__CurrentPrice"]').text().trim();
+    const image = $('img[class*="ProductImage"]').attr('src');
+    return { price, image };
+};
+
+export async function POST(request: Request) {
+    try {
+        const { url } = await request.json();
+
+        if (!url) {
+            return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+        }
+
+        const html = await fetchWithRetry(url);
+        
+        if (!html) {
+            return NextResponse.json({ error: 'Failed to fetch page content' }, { status: 500 });
+        }
+
+        const $ = cheerio.load(html);
+
+        const getMeta = (name: string) => 
+            $(`meta[name="${name}"]`).attr('content') || 
+            $(`meta[property="${name}"]`).attr('content') || 
+            $(`meta[property="og:${name}"]`).attr('content') ||
+            $(`meta[property="twitter:${name}"]`).attr('content') ||
+            $(`meta[itemprop="${name}"]`).attr('content');
+
+        // Initial Extraction from Meta Tags (Universal)
+        let title = getMeta('title') || $('title').text() || '';
+        let image = getMeta('image');
+        let price = getMeta('product:price:amount') || getMeta('price:amount') || '';
+
+        // Domain Specific Enhancements
+        const domain = new URL(url).hostname.toLowerCase();
+        let specificData = { price: '', image: '' };
+
+        if (domain.includes('amazon')) {
+            specificData = parseAmazon($);
+        } else if (domain.includes('flipkart')) {
+            specificData = parseFlipkart($);
+        } else if (domain.includes('myntra')) {
+            specificData = parseMyntra($);
+        } else if (domain.includes('ajio')) {
+            specificData = parseAjio($);
+        } else if (domain.includes('meesho')) {
+            specificData = parseMeesho($);
+        }
+
+        // Apply domain specific overrides if found
+        if (specificData.price) price = specificData.price;
+        if (specificData.image) image = specificData.image;
+
+        // JSON-LD Fallback (Very reliable for most sites)
+        if (!price || !image) {
+             $('script[type="application/ld+json"]').each((_, el) => {
+                if (price && image) return;
+                try {
+                    const html = $(el).html();
+                    if (!html) return;
+                    const json = JSON.parse(html);
+                    const items = Array.isArray(json) ? json : [json];
+                    const product = items.find(i => 
+                        i['@type'] === 'Product' || 
+                        (Array.isArray(i['@type']) && i['@type'].includes('Product'))
+                    );
+                  
+                    if (product) {
+                        if (!image && product.image) {
+                            image = Array.isArray(product.image) ? product.image[0] : product.image;
+                            // Handle object format {url: '...'}
+                            if (typeof image === 'object' && image.url) image = image.url;
+                        }
+                        
+                        if (!price && product.offers) {
+                            const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers;
+                            if (offer) {
+                                price = offer.price || offer.lowPrice || offer.highPrice;
+                            }
+                        }
+                    }
+                } catch (e) {}
+            });
+        }
+
+        // Generic Fallbacks
+        if (!image) {
+            image = $('link[rel="image_src"]').attr('href');
+            if (!image) {
+                // Find largest image
+                let maxArea = 0;
+                $('img').each((_, el) => {
+                    const src = $(el).attr('src');
+                    if (src && src.startsWith('http') && !src.includes('sprite') && !src.includes('icon')) {
+                         // Basic heuristic
+                         image = src; // Take first decent looking image
+                    }
+                });
+            }
+        }
+
+        // Clean up
+        const finalPrice = cleanPrice(price);
+        
+        return NextResponse.json({
+            title: title.trim(),
+            image: image || '',
+            price: finalPrice || '',
+            url
+        });
+
+    } catch (error) {
+        console.error('Error fetching metadata:', error);
+        return NextResponse.json({ error: 'Failed to fetch metadata' }, { status: 500 });
+    }
 }
