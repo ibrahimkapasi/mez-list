@@ -243,9 +243,14 @@ export async function POST(request: Request) {
                   
                     if (product) {
                         if (!image && product.image) {
-                            image = Array.isArray(product.image) ? product.image[0] : product.image;
+                            let extractedImage = Array.isArray(product.image) ? product.image[0] : product.image;
                             // Handle object format {url: '...'}
-                            if (typeof image === 'object' && image.url) image = image.url;
+                            if (typeof extractedImage === 'object' && extractedImage.url) {
+                                extractedImage = extractedImage.url;
+                            }
+                            if (typeof extractedImage === 'string') {
+                                image = extractedImage;
+                            }
                         }
                         
                         if (!price && product.offers) {
