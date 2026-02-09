@@ -7,7 +7,9 @@ const USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
 ];
 
 const getRandomUserAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
@@ -131,6 +133,46 @@ const parseMeesho = ($: cheerio.CheerioAPI) => {
     return { price, image };
 };
 
+const parseHM = ($: cheerio.CheerioAPI) => {
+    const price = 
+        $('#product-price .price-value').text().trim() || 
+        $('.product-item-price').first().text().trim() ||
+        $('span.price-value').text().trim();
+            
+    const image = 
+        $('.product-detail-main-image-container img').first().attr('src') ||
+        $('.product-detail-main-image img').first().attr('src') ||
+        $('figure.pdp-image img').first().attr('src');
+        
+    return { price, image };
+};
+
+const parseZara = ($: cheerio.CheerioAPI) => {
+    const price = 
+        $('.price__amount').first().text().trim() || 
+        $('.product-detail-info__price-amount').text().trim();
+    
+    // Zara images are often in a media-image class or set as background
+    let image = 
+        $('.media-image__image').first().attr('src') || 
+        $('.product-detail-images__image').first().attr('src');
+        
+    return { price, image };
+};
+
+const parseSavana = ($: cheerio.CheerioAPI) => {
+    // Savana (Urbanic) specific
+    const price = 
+        $('.product-price').first().text().trim() ||
+        $('div[class*="price"]').first().text().trim();
+
+    const image = 
+        $('.product-image').first().attr('src') ||
+        $('img[class*="gallery"]').first().attr('src');
+
+    return { price, image };
+};
+
 export async function POST(request: Request) {
     try {
         const { url } = await request.json();
@@ -173,6 +215,12 @@ export async function POST(request: Request) {
             specificData = parseAjio($);
         } else if (domain.includes('meesho')) {
             specificData = parseMeesho($);
+        } else if (domain.includes('hm.com') || domain.includes('h&m')) {
+            specificData = parseHM($);
+        } else if (domain.includes('zara')) {
+            specificData = parseZara($);
+        } else if (domain.includes('savana') || domain.includes('urbanic')) {
+            specificData = parseSavana($);
         }
 
         // Apply domain specific overrides if found
@@ -215,13 +263,17 @@ export async function POST(request: Request) {
         if (!image) {
             image = $('link[rel="image_src"]').attr('href');
             if (!image) {
-                // Find largest image
-                let maxArea = 0;
+                // Find largest image or best candidate
                 $('img').each((_, el) => {
                     const src = $(el).attr('src');
-                    if (src && src.startsWith('http') && !src.includes('sprite') && !src.includes('icon')) {
-                         // Basic heuristic
-                         image = src; // Take first decent looking image
+                    if (src && src.startsWith('http') && !src.includes('sprite') && !src.includes('icon') && !src.includes('logo')) {
+                         // Prefer images with 'product' or 'pdp' in url
+                         if (src.toLowerCase().includes('product') || src.toLowerCase().includes('pdp') || src.toLowerCase().includes('large')) {
+                             image = src;
+                             return false; // Found a good candidate, stop
+                         }
+                         // Keep the first decent image as backup if we haven't found one yet
+                         if (!image) image = src;
                     }
                 });
             }
